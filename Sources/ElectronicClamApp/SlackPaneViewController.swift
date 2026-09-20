@@ -132,7 +132,7 @@ final class SlackPaneViewController: NSViewController, NSTextFieldDelegate {
         digestPopup.target = self
         digestPopup.action = #selector(controlChanged)
         digestPopup.removeAllItems()
-        digestPopup.addItems(withTitles: SlackSupport.digestIntervalChoices.map {
+        digestPopup.addItems(withTitles: ChatNotify.digestIntervalChoices.map {
             NSLf("duration.minutes", "%d min", $0)
         })
         digestPopup.toolTip = digestTip
@@ -227,7 +227,7 @@ final class SlackPaneViewController: NSViewController, NSTextFieldDelegate {
         startCheckbox.state = s.notifyAwakeStart ? .on : .off
         digestCheckbox.state = s.digestIntervalMin > 0 ? .on : .off
         let shown = s.digestIntervalMin > 0 ? s.digestIntervalMin : lastDigestChoice()
-        if let idx = SlackSupport.digestIntervalChoices.firstIndex(of: shown),
+        if let idx = ChatNotify.digestIntervalChoices.firstIndex(of: shown),
            digestPopup.indexOfSelectedItem != idx {
             digestPopup.selectItem(at: idx)
         }
@@ -260,15 +260,15 @@ final class SlackPaneViewController: NSViewController, NSTextFieldDelegate {
     /// 마지막 비-off 다이제스트 간격. 기본 30분.
     private func lastDigestChoice() -> Int {
         let v = UserDefaults.standard.integer(forKey: Self.lastDigestChoiceKey)
-        return SlackSupport.digestIntervalChoices.contains(v) ? v : 30
+        return ChatNotify.digestIntervalChoices.contains(v) ? v : 30
     }
 
     /// 컨트롤 → 설정 저장. 모든 변경 경로가 이 한 곳을 거친다.
     private func commit() {
         let digestOn = digestCheckbox.state == .on
         let idx = digestPopup.indexOfSelectedItem
-        let chosen = SlackSupport.digestIntervalChoices.indices.contains(idx)
-            ? SlackSupport.digestIntervalChoices[idx] : lastDigestChoice()
+        let chosen = ChatNotify.digestIntervalChoices.indices.contains(idx)
+            ? ChatNotify.digestIntervalChoices[idx] : lastDigestChoice()
         if digestOn {
             UserDefaults.standard.set(chosen, forKey: Self.lastDigestChoiceKey)
         }
