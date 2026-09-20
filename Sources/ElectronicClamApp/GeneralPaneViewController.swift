@@ -914,15 +914,13 @@ final class GeneralPaneViewController: NSViewController {
         store.setClamshellLockGuard(clamshellGuardCheckbox.state == .on)
     }
 
-    /// ADR-0037 S3 — persist the opt-in VPN-disconnect notification (independent of
-    /// the clamshell guard). The StateStore setter fires onChange → convergeNow →
-    /// VpnWatcher.apply, which arms or stops the scutil poll to match.
     /// 디스플레이 keep-awake opt-in 영속. StateStore 세터가 onChange → convergeNow →
     /// `DisplayAwakeHolder.apply` 로 이어져 assertion 을 즉시 잡거나 놓는다.
     @objc private func keepDisplayAwakeToggled() {
         store.setKeepDisplayAwake(keepDisplayAwakeCheckbox.state == .on)
     }
 
+    /// ADR-0037 S3 — persist the opt-in VPN-disconnect notification.
     @objc private func vpnNotifyToggled() {
         store.setVpnDisconnectNotify(vpnNotifyCheckbox.state == .on)
     }

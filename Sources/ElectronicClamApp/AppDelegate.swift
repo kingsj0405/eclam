@@ -107,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 디스플레이 keep-awake 홀더. 위 둘과 같은 성질로 붙잡기만 해도 비용이 없다
         // (`apply(...)` 가 결정하기 전까지 assertion 을 만들지 않는다). MenuBarController
         // 는 "Blank screen → Sleep" 경로에서만 이 홀더를 잠시 비켜세운다.
-        let displayAwakeHolder = DisplayAwakeHolder(store: store)
+        let displayAwakeHolder = DisplayAwakeHolder()
         self.displayAwakeHolder = displayAwakeHolder
         menuBar.displayAwakeHolder = displayAwakeHolder
 
@@ -467,7 +467,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 막지 못하므로, 화면까지 켜 두려면 별도 assertion 이 필요하다. 위 둘과 같은
         // 이유로 no-op early-return **위**에 둔다 — keep 이 그대로여도 설정만 바뀐 수렴을
         // 반영해야 한다.
-        displayAwakeHolder?.apply(keepAwake: target)
+        displayAwakeHolder?.apply(keepAwake: target && store.keepDisplayAwakeEnabled)
 
         if let last = lastWrittenSleepDisabled, last == target { return }
 

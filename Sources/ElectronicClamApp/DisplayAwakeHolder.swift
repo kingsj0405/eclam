@@ -1,4 +1,3 @@
-import AppKit
 import CoreGraphics
 import Foundation
 import IOKit.pwr_mgt
@@ -27,7 +26,6 @@ import OSLog
 /// 이라, 거기서만 `suspendUntilUserReturns()` 로 비켜 준다.
 final class DisplayAwakeHolder {
     private let log = Logger(subsystem: "com.jadhvank.eclam", category: "displayawake")
-    private let store: StateStore
 
     /// 잡고 있는 display-sleep 방지 assertion. 0 = 없음.
     private var assertionID: IOPMAssertionID = 0
@@ -48,26 +46,12 @@ final class DisplayAwakeHolder {
     private let activeIdleThreshold: TimeInterval = 2.0
     private let pollInterval: TimeInterval = 0.5
 
-    /// 지금 실제로 assertion 을 잡고 있는지(진단·CLI status 용).
-    var isHolding: Bool { assertionID != 0 }
-
-    init(store: StateStore) {
-        self.store = store
-        // 안전망. assertion 은 프로세스 종료 시 커널이 어차피 풀지만, 명시적으로
-        // 풀어 두면 `pmset -g assertions` 에 잔상이 남는 구간이 없다.
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
-        ) { [weak self] _ in self?.releaseAssertion() }
-    }
-
-    /// `convergeNow` 가 매 수렴마다 호출한다(멱등). keep 신호와 opt-in 이 **둘 다**
-    /// 참일 때만 잡는다 — VpnWatcher.apply 와 같은 게이트 모양이다. 설정만 바뀌고
-    /// keep 은 그대로인 경우도 반영되도록 convergeNow 의 no-op early-return 위에서
-    /// 불린다.
+    /// AppDelegate가 keep 신호와 opt-in을 합쳐 전달하고, 종료 시 false로 해제한다.
+    /// 설정 변경도 반영하도록 convergeNow의 no-op early-return 위에서 불린다.
     func apply(keepAwake: Bool) {
         // 값이 그대로여도 reconcile 을 부른다 — 멱등이고, 앞선 assertion 획득이
         // 실패했을 때 다음 수렴에서 자연히 재시도된다.
-        wanted = keepAwake && store.keepDisplayAwakeEnabled
+        wanted = keepAwake
         reconcile()
     }
 
