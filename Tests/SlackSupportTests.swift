@@ -1,6 +1,6 @@
 /// SlackSupportTests.swift — Slack 알림 순수 계층 검증.
 ///
-/// 1) 게이팅: 마스터·체크박스·최소 길이·시작 스로틀 (ChatNotify 위임분 포함)
+/// 1) 게이팅: Slack 설정으로 ChatNotify의 마스터·체크박스·최소 길이·시작 스로틀 검증
 /// 2) 자격 정보·채널 표기 검사 (봇 토큰 / webhook URL / 채널 ID)
 /// 3) conversations.list 채널 ID 파싱 + 페이지 커서
 /// 4) chat.postMessage 결과 파싱 + error 코드 분류
@@ -47,55 +47,55 @@ func listPage(_ names: [(String, String)], cursor: String? = nil, ok: Bool = tru
 enum SlackSupportTestMain {
     static func main() {
         print("── 게이팅: 종료 이벤트")
-        assert(SlackSupport.shouldNotifyEnd(settings: cfg(), reason: .batteryLow,
+        assert(ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .batteryLow,
                                             durationSeconds: 5),
                "안전 가드 해제는 길이와 무관하게 전송")
-        assert(!SlackSupport.shouldNotifyEnd(settings: cfg(safety: false), reason: .batteryLow,
+        assert(!ChatNotify.shouldNotifyEnd(settings: cfg(safety: false), reason: .batteryLow,
                                              durationSeconds: 5),
                "안전 체크박스 OFF ⇒ 미전송")
-        assert(!SlackSupport.shouldNotifyEnd(settings: cfg(), reason: .agentCeased,
+        assert(!ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased,
                                              durationSeconds: 30),
                "1분 미만 에이전트 종료는 소음 ⇒ 미전송")
-        assert(SlackSupport.shouldNotifyEnd(settings: cfg(), reason: .agentCeased,
+        assert(ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased,
                                             durationSeconds: 120),
                "1분 이상 에이전트 종료 ⇒ 전송")
-        assert(!SlackSupport.shouldNotifyEnd(settings: cfg(), reason: .manualOff,
+        assert(!ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .manualOff,
                                              durationSeconds: 600),
                "사용자가 직접 끈 종료 ⇒ 절대 미전송")
-        assert(!SlackSupport.shouldNotifyEnd(settings: cfg(enabled: false), reason: .batteryLow,
+        assert(!ChatNotify.shouldNotifyEnd(settings: cfg(enabled: false), reason: .batteryLow,
                                              durationSeconds: 600),
                "마스터 OFF ⇒ 미전송")
-        assert(!SlackSupport.shouldNotifyEnd(settings: cfg(channel: ""), reason: .batteryLow,
+        assert(!ChatNotify.shouldNotifyEnd(settings: cfg(channel: ""), reason: .batteryLow,
                                              durationSeconds: 600),
                "채널 미입력 ⇒ 미전송")
-        assert(SlackSupport.endChannel(for: .watchdog) == .safety, "watchdog → safety")
-        assert(SlackSupport.endChannel(for: .remoteEnded) == .awakeEnd, "remoteEnded → awakeEnd")
-        assert(SlackSupport.endChannel(for: .appQuit) == .never, "appQuit → never")
+        assert(ChatNotify.endChannel(for: .watchdog) == .safety, "watchdog → safety")
+        assert(ChatNotify.endChannel(for: .remoteEnded) == .awakeEnd, "remoteEnded → awakeEnd")
+        assert(ChatNotify.endChannel(for: .appQuit) == .never, "appQuit → never")
 
         print("── 게이팅: 시작 이벤트")
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        assert(SlackSupport.shouldNotifyStart(settings: cfg(), cause: .agent,
+        assert(ChatNotify.shouldNotifyStart(settings: cfg(), cause: .agent,
                                               lastStartAt: nil, now: now),
                "첫 시작 ⇒ 전송")
-        assert(!SlackSupport.shouldNotifyStart(settings: cfg(start: false), cause: .agent,
+        assert(!ChatNotify.shouldNotifyStart(settings: cfg(start: false), cause: .agent,
                                                lastStartAt: nil, now: now),
                "시작 체크박스 OFF ⇒ 미전송")
-        assert(!SlackSupport.shouldNotifyStart(settings: cfg(), cause: .manual,
+        assert(!ChatNotify.shouldNotifyStart(settings: cfg(), cause: .manual,
                                                lastStartAt: nil, now: now),
                "수동 시작 ⇒ 미전송")
-        assert(!SlackSupport.shouldNotifyStart(settings: cfg(), cause: .agent,
+        assert(!ChatNotify.shouldNotifyStart(settings: cfg(), cause: .agent,
                                                lastStartAt: now.addingTimeInterval(-60), now: now),
                "5분 이내 재시작 ⇒ 스로틀")
-        assert(SlackSupport.shouldNotifyStart(settings: cfg(), cause: .agent,
+        assert(ChatNotify.shouldNotifyStart(settings: cfg(), cause: .agent,
                                               lastStartAt: now.addingTimeInterval(-600), now: now),
                "5분 지난 재시작 ⇒ 전송")
 
         print("── 게이팅: 다이제스트")
-        assert(SlackSupport.shouldSendDigest(settings: cfg(digest: 30), episodeOngoing: true),
+        assert(ChatNotify.shouldSendDigest(settings: cfg(digest: 30), episodeOngoing: true),
                "에피소드 중 + 간격 30 ⇒ 전송")
-        assert(!SlackSupport.shouldSendDigest(settings: cfg(digest: 0), episodeOngoing: true),
+        assert(!ChatNotify.shouldSendDigest(settings: cfg(digest: 0), episodeOngoing: true),
                "간격 0(off, 기본) ⇒ 미전송")
-        assert(!SlackSupport.shouldSendDigest(settings: cfg(digest: 30), episodeOngoing: false),
+        assert(!ChatNotify.shouldSendDigest(settings: cfg(digest: 30), episodeOngoing: false),
                "에피소드 없음(유휴) ⇒ 미전송")
 
         print("── 토큰 형식")

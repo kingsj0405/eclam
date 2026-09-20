@@ -35,13 +35,8 @@ final class SlackNotifier {
     private var lastStartNotifiedAt: Date?
 
     /// 주기 다이제스트 상태 — 에피소드 진행 중에만 타이머가 산다. 메인 스레드 전용.
-    private var episodeOngoing = false
     private var episodeStartedAt: Date?
     private var digestTimer: Timer?
-
-    /// 마지막 전송 결과 — Settings 패널이 표시. nil ⇒ 이번 세션 전송 없음.
-    private(set) var lastSendResult: String?
-    private(set) var lastSendAt: Date?
 
     /// 채널 이름 조회에서 훑을 최대 페이지 수. 워크스페이스가 아주 크면
     /// 전수 조회가 rate limit 을 부르므로, 못 찾으면 ID 직접 입력을 안내한다.
@@ -113,8 +108,8 @@ final class SlackNotifier {
     private func reconfigureDigestTimer() {
         digestTimer?.invalidate()
         digestTimer = nil
-        guard SlackSupport.shouldSendDigest(settings: settings,
-                                            episodeOngoing: episodeOngoing) else { return }
+        guard ChatNotify.shouldSendDigest(settings: settings,
+                                          episodeOngoing: episodeStartedAt != nil) else { return }
         let interval = TimeInterval(settings.digestIntervalMin * 60)
         let t = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             self?.digestTick()
@@ -124,8 +119,8 @@ final class SlackNotifier {
     }
 
     private func digestTick() {
-        guard SlackSupport.shouldSendDigest(settings: settings,
-                                            episodeOngoing: episodeOngoing) else { return }
+        guard ChatNotify.shouldSendDigest(settings: settings,
+                                          episodeOngoing: episodeStartedAt != nil) else { return }
         let dur = ChatNotify.formatDuration(
             Date().timeIntervalSince(episodeStartedAt ?? Date()))
         let head = NSLf("slack.digest", "📊 Still awake — %@", dur)
@@ -135,12 +130,11 @@ final class SlackNotifier {
     // MARK: - Episode events (AwakeHistoryStore 탭, 메인 스레드)
 
     func episodeStarted(_ ep: AwakeEpisode) {
-        episodeOngoing = true
         episodeStartedAt = ep.startedAt
         reconfigureDigestTimer()
-        guard SlackSupport.shouldNotifyStart(settings: settings,
-                                             cause: ep.startCause,
-                                             lastStartAt: lastStartNotifiedAt) else { return }
+        guard ChatNotify.shouldNotifyStart(settings: settings,
+                                           cause: ep.startCause,
+                                           lastStartAt: lastStartNotifiedAt) else { return }
         lastStartNotifiedAt = Date()
         let head: String
         switch ep.startCause {
@@ -155,12 +149,11 @@ final class SlackNotifier {
     }
 
     func episodeEnded(_ ep: AwakeEpisode) {
-        episodeOngoing = false
         episodeStartedAt = nil
         reconfigureDigestTimer()
-        guard SlackSupport.shouldNotifyEnd(settings: settings,
-                                           reason: ep.endReason ?? .unknown,
-                                           durationSeconds: ep.duration) else { return }
+        guard ChatNotify.shouldNotifyEnd(settings: settings,
+                                         reason: ep.endReason ?? .unknown,
+                                         durationSeconds: ep.duration) else { return }
         let dur = ChatNotify.formatDuration(ep.duration)
         let head: String
         switch ep.endReason ?? .unknown {
@@ -421,7 +414,7 @@ final class SlackNotifier {
         return request
     }
 
-    /// 결과 기록 + completion 마샬링. 토큰은 절대 로그에 남기지 않는다.
+    /// 결과 로그 + completion 마샬링. 토큰은 절대 로그에 남기지 않는다.
     private func finish(_ error: String?, completion: ((String?) -> Void)?) {
         if let error = error {
             log.error("slack send error: \(error, privacy: .public)")
@@ -429,8 +422,6 @@ final class SlackNotifier {
             log.info("slack message sent")
         }
         DispatchQueue.main.async {
-            self.lastSendResult = error
-            self.lastSendAt = Date()
             completion?(error)
         }
     }

@@ -88,38 +88,8 @@ struct SlackSettings: Codable, Equatable, ChatNotifySettings {
     }
 }
 
-/// Slack 전용 검사·파싱 + 공통 게이팅 위임.
+/// Slack 전용 검사·파싱. 알림 정책은 ChatNotify를 직접 사용한다.
 enum SlackSupport {
-
-    typealias EndChannel = ChatNotify.EndChannel
-
-    static let minEndEpisodeSeconds = ChatNotify.minEndEpisodeSeconds
-    static let minStartGapSeconds = ChatNotify.minStartGapSeconds
-    static let digestIntervalChoices = ChatNotify.digestIntervalChoices
-
-    static func shouldSendDigest(settings: SlackSettings,
-                                 episodeOngoing: Bool) -> Bool {
-        ChatNotify.shouldSendDigest(settings: settings, episodeOngoing: episodeOngoing)
-    }
-
-    static func endChannel(for reason: AwakeEndReason) -> EndChannel {
-        ChatNotify.endChannel(for: reason)
-    }
-
-    static func shouldNotifyEnd(settings: SlackSettings,
-                                reason: AwakeEndReason,
-                                durationSeconds: TimeInterval) -> Bool {
-        ChatNotify.shouldNotifyEnd(settings: settings, reason: reason,
-                                   durationSeconds: durationSeconds)
-    }
-
-    static func shouldNotifyStart(settings: SlackSettings,
-                                  cause: AwakeStartCause,
-                                  lastStartAt: Date?,
-                                  now: Date = Date()) -> Bool {
-        ChatNotify.shouldNotifyStart(settings: settings, cause: cause,
-                                     lastStartAt: lastStartAt, now: now)
-    }
 
     // MARK: - 자격 정보 · 채널 표기
 

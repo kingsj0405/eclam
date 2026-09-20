@@ -7,8 +7,7 @@
 //
 // 백엔드 공통 게이팅(언제 보낼지)은 `ChatNotify` 로 옮겼고 Slack 과 공유한다.
 // 여기 남는 것은 Telegram 에만 있는 것 — 설정 타입, 봇 토큰 형식 검사,
-// Bot API 응답 파싱. 아래 wrapper 들은 기존 호출부·테스트를 그대로 두기 위한
-// 얇은 위임이다.
+// Bot API 응답 파싱. 호출부·테스트는 공통 정책을 직접 사용한다.
 
 import Foundation
 
@@ -73,53 +72,8 @@ struct TelegramSettings: Codable, Equatable, ChatNotifySettings {
     }
 }
 
-/// Telegram 전용 파싱 + 공통 게이팅 위임.
+/// Telegram 전용 검사·파싱.
 enum TelegramSupport {
-
-    /// 종료 알림이 분류되는 채널. 설정 체크박스와 1:1 (공통 정의 재수출).
-    typealias EndChannel = ChatNotify.EndChannel
-
-    static let minEndEpisodeSeconds = ChatNotify.minEndEpisodeSeconds
-    static let minStartGapSeconds = ChatNotify.minStartGapSeconds
-    static let digestIntervalChoices = ChatNotify.digestIntervalChoices
-
-    static func shouldSendDigest(settings: TelegramSettings,
-                                 episodeOngoing: Bool) -> Bool {
-        ChatNotify.shouldSendDigest(settings: settings, episodeOngoing: episodeOngoing)
-    }
-
-    static func endChannel(for reason: AwakeEndReason) -> EndChannel {
-        ChatNotify.endChannel(for: reason)
-    }
-
-    static func shouldNotifyEnd(settings: TelegramSettings,
-                                reason: AwakeEndReason,
-                                durationSeconds: TimeInterval) -> Bool {
-        ChatNotify.shouldNotifyEnd(settings: settings, reason: reason,
-                                   durationSeconds: durationSeconds)
-    }
-
-    static func shouldNotifyStart(settings: TelegramSettings,
-                                  cause: AwakeStartCause,
-                                  lastStartAt: Date?,
-                                  now: Date = Date()) -> Bool {
-        ChatNotify.shouldNotifyStart(settings: settings, cause: cause,
-                                     lastStartAt: lastStartAt, now: now)
-    }
-
-    static func formatDuration(_ seconds: TimeInterval) -> String {
-        ChatNotify.formatDuration(seconds)
-    }
-
-    static func statusLine(batteryPercent: Int?,
-                           charging: Bool,
-                           socTempCelsius: Double?,
-                           activeAgents: [String],
-                           host: String? = nil) -> String? {
-        ChatNotify.statusLine(batteryPercent: batteryPercent, charging: charging,
-                              socTempCelsius: socTempCelsius,
-                              activeAgents: activeAgents, host: host)
-    }
 
     /// 봇 토큰 형식 대충 검사 — `<digits>:<35자 내외 base64url>`. API 호출 전
     /// 명백한 오타(공백·따옴표 포함 등)를 UI 단에서 거르는 용도일 뿐, 통과가
