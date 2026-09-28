@@ -4,7 +4,7 @@
 // LaunchctlInspectTests.swift assert/print/exit(1) style. Exits 0 on success,
 // 1 on the first failed assert.
 //
-// VpnWatcher.swift 는 StateStore·TelegramNotifier·ReleaseNotifier·NSL 에 결합돼
+// VpnWatcher.swift 는 StateStore·TelegramNotifier·SlackNotifier·ReleaseNotifier·NSL 에 결합돼
 // 있어 단독 컴파일이 안 된다(그 결합부는 라이브 GUI·XPC 라 어차피 수동 검증). 그래서
 // LaunchctlInspectTests 가 Subprocess.swift 를 "심볼 해소용"으로만 끌고 오듯,
 // 여기서는 VpnWatcher 가 참조하는 최소 심볼만 **테스트 전용 스텁**으로 정의해
@@ -25,6 +25,11 @@ final class StateStore {
 
 final class TelegramNotifier {
     static let shared = TelegramNotifier()
+    func notifyVpnDisconnected(serviceName: String) {}
+}
+
+final class SlackNotifier {
+    static let shared = SlackNotifier()
     func notifyVpnDisconnected(serviceName: String) {}
 }
 
