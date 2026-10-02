@@ -38,6 +38,12 @@ final class SlackNotifier {
     private var episodeStartedAt: Date?
     private var digestTimer: Timer?
 
+    /// 종료 정착 창·깜빡임 집계 (ChatNotify.SettleDriver, 2026-10-02). 메인 스레드 전용.
+    /// awakeEnd 채널 종료는 정착 창이 끝날 때까지 보류되고, 문안·전송만 여기로 돌아온다.
+    private lazy var settle = ChatNotify.SettleDriver(
+        emitEnd: { [weak self] in self?.emitEnd($0) },
+        emitFlapSummary: { [weak self] in self?.emitFlapSummary($0) })
+
     /// 채널 이름 조회에서 훑을 최대 페이지 수. 워크스페이스가 아주 크면
     /// 전수 조회가 rate limit 을 부르므로, 못 찾으면 ID 직접 입력을 안내한다.
     private static let maxLookupPages = 5
@@ -130,8 +136,12 @@ final class SlackNotifier {
     // MARK: - Episode events (AwakeHistoryStore 탭, 메인 스레드)
 
     func episodeStarted(_ ep: AwakeEpisode) {
-        episodeStartedAt = ep.startedAt
+        let proceed = settle.episodeStarted(ep)
+        // 다이제스트 기준 시각은 이어 본 세션의 첫 시작.
+        episodeStartedAt = settle.chainStartedAt ?? ep.startedAt
         reconfigureDigestTimer()
+        // 정착 창 안의 같은 원인 재시작 — 보류 종료와 이 시작을 모두 삼켰다.
+        guard proceed else { return }
         guard ChatNotify.shouldNotifyStart(settings: settings,
                                            cause: ep.startCause,
                                            lastStartAt: lastStartNotifiedAt) else { return }
@@ -151,11 +161,21 @@ final class SlackNotifier {
     func episodeEnded(_ ep: AwakeEpisode) {
         episodeStartedAt = nil
         reconfigureDigestTimer()
-        guard ChatNotify.shouldNotifyEnd(settings: settings,
-                                         reason: ep.endReason ?? .unknown,
-                                         durationSeconds: ep.duration) else { return }
-        let dur = ChatNotify.formatDuration(ep.duration)
-        let head: String
+        settle.episodeEnded(ep, settings: settings)
+    }
+
+    private func emitFlapSummary(_ summary: ChatNotify.EndSettler.FlapSummary) {
+        let head = NSLf("slack.flapSummary", "🔁 %1$d short awake blips in the last %2$@ (%3$@)",
+                        summary.count, ChatNotify.formatDuration(ChatNotify.flapSummaryIntervalSeconds),
+                        ChatNotify.formatFlapBreakdown(summary.byDetail))
+        send(compose(head))
+    }
+
+    /// 종료 한 통 — 사유별 문안 + (있으면) 합친 재시작 수 꼬리.
+    private func emitEnd(_ emission: ChatNotify.EndSettler.Emission) {
+        let ep = emission.episode
+        let dur = ChatNotify.formatDuration(emission.duration)
+        var head: String
         switch ep.endReason ?? .unknown {
         case .agentCeased:
             head = NSLf("slack.end.agentIdle", "⚪️ %1$@ went idle — awake ended after %2$@",
@@ -180,6 +200,9 @@ final class SlackNotifier {
             // manualOff/forceSleep/appQuit 은 게이팅에서 .never 로 걸러졌고,
             // 여기 남는 건 unknown 뿐.
             head = NSLf("slack.end.generic", "⚪️ Awake ended after %@", dur)
+        }
+        if emission.mergedCount > 0 {
+            head += NSLf("slack.end.mergedSuffix", " · %d short restarts merged", emission.mergedCount)
         }
         send(compose(head))
     }

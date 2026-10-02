@@ -56,9 +56,12 @@ enum SlackSupportTestMain {
         assert(!ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased,
                                              durationSeconds: 30),
                "1분 미만 에이전트 종료는 소음 ⇒ 미전송")
+        assert(!ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased,
+                                             durationSeconds: 65),
+               "원격 유예(60초)만큼의 깜빡임 ⇒ 미전송 — 최소 길이가 유예보다 길다")
         assert(ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased,
                                             durationSeconds: 120),
-               "1분 이상 에이전트 종료 ⇒ 전송")
+               "2분 이상 에이전트 종료 ⇒ 전송")
         assert(!ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .manualOff,
                                              durationSeconds: 600),
                "사용자가 직접 끈 종료 ⇒ 절대 미전송")
@@ -202,6 +205,110 @@ enum SlackSupportTestMain {
                "ratelimited → rateLimited")
         assert(SlackSupport.classify(error: "weird_new_code") == .other("weird_new_code"),
                "모르는 코드는 그대로 노출")
+
+        print("── 종료 정착 창 (EndSettler)")
+        func ep(_ start: Date, _ len: TimeInterval, cause: AwakeStartCause = .remote,
+                detail: String? = "pmset:NetworkClient",
+                reason: AwakeEndReason = .remoteEnded) -> AwakeEpisode {
+            var e = AwakeEpisode(startedAt: start, startCause: cause, startDetail: detail)
+            e.endedAt = start.addingTimeInterval(len)
+            e.endReason = reason
+            e.endDetail = detail
+            return e
+        }
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        do {
+            // 1분 깜빡임 20연속(실사고 패턴: 62초 켜짐 + 5초 꺼짐) — 즉시 전송 0,
+            // 정착 뒤 누적 길이로 한 통.
+            var st = ChatNotify.EndSettler()
+            var held = 0, swallowed = 0, notified = 0
+            var t = t0
+            for _ in 0..<20 {
+                let e = ep(t, 62)
+                switch st.noteStart(e, now: t) {
+                case .notify: notified += 1
+                case .swallowed: swallowed += 1
+                case .flushThenNotify: assert(false, "같은 원인 재시작에 flush 가 나오면 안 된다")
+                }
+                t = t.addingTimeInterval(62)
+                if case .hold = st.noteEnd(e, settings: cfg(), now: t) { held += 1 }
+                t = t.addingTimeInterval(5)
+            }
+            assert(notified == 1 && swallowed == 19, "첫 시작만 notify, 나머지 19회는 swallowed (got \(notified)/\(swallowed))")
+            assert(held == 20, "스무 번 모두 보류(hold) — 즉시 전송 0 (got \(held))")
+            let em = st.settle(now: t.addingTimeInterval(ChatNotify.endSettleSeconds))
+            assert(em != nil, "정착 뒤 종료 한 통")
+            assert(em?.mergedCount == 19, "합친 재시작 19회 (got \(em?.mergedCount ?? -1))")
+            assert((em?.duration ?? 0) > 20 * 60, "길이는 첫 시작부터 누적 (got \(em?.duration ?? 0))")
+            assert(em?.episode.endReason == .remoteEnded, "사유는 마지막 에피소드의 것")
+            assert(st.flapCount == 19 && st.flapByDetail["pmset:NetworkClient"] == 19,
+                   "삼킨 재시작 19회는 요약 집계로 남는다")
+        }
+        do {
+            // 한 번만 깜빡이고 끝 — 62초짜리는 너무 짧아 버리고 요약에만 집계.
+            var st = ChatNotify.EndSettler()
+            let e = ep(t0, 62)
+            assert(st.noteStart(e, now: t0) == .notify, "새 세션 ⇒ notify")
+            let endAt = t0.addingTimeInterval(62)
+            let action = st.noteEnd(e, settings: cfg(), now: endAt)
+            assert(action == .hold(until: endAt.addingTimeInterval(ChatNotify.endSettleSeconds)),
+                   "awakeEnd 종료 ⇒ hold, 만료 = 종료 + 정착 창")
+            let due = endAt.addingTimeInterval(ChatNotify.endSettleSeconds)
+            assert(st.settle(now: due) == nil, "62초 단발은 전송하지 않는다")
+            assert(st.flapCount == 1 && st.flapByDetail["pmset:NetworkClient"] == 1,
+                   "대신 깜빡임 1회로 집계")
+            assert(st.flapSummaryDueAt == due.addingTimeInterval(ChatNotify.flapSummaryIntervalSeconds),
+                   "요약 예정 시각 = 첫 깜빡임 + 간격")
+            let sum = st.takeFlapSummary()
+            assert(sum?.count == 1 && sum?.byDetail == ["pmset:NetworkClient": 1], "요약 1건")
+            assert(st.takeFlapSummary() == nil && st.flapSummaryDueAt == nil,
+                   "요약을 꺼내면 집계가 비워진다")
+        }
+        do {
+            // 진짜 종료: 10분 세션 → 정착 창 동안 재시작 없음 → 한 통.
+            var st = ChatNotify.EndSettler()
+            let e = ep(t0, 600, cause: .agent, detail: "claude", reason: .agentCeased)
+            _ = st.noteStart(e, now: t0)
+            let endAt = t0.addingTimeInterval(600)
+            _ = st.noteEnd(e, settings: cfg(), now: endAt)
+            let em = st.settle(now: endAt.addingTimeInterval(ChatNotify.endSettleSeconds))
+            assert(em?.duration == 600 && em?.mergedCount == 0, "10분 세션 그대로 한 통")
+            assert(st.flapCount == 0, "깜빡임 집계 없음")
+        }
+        do {
+            // 원인이 바뀐 재시작: 원격 종료 보류 중 에이전트 시작 ⇒ 보류분 즉시 flush.
+            var st = ChatNotify.EndSettler()
+            let remote = ep(t0, 900)
+            _ = st.noteStart(remote, now: t0)
+            _ = st.noteEnd(remote, settings: cfg(), now: t0.addingTimeInterval(900))
+            let agent = ep(t0.addingTimeInterval(910), 300, cause: .agent, detail: "claude", reason: .agentCeased)
+            let a = st.noteStart(agent, now: t0.addingTimeInterval(910))
+            if case .flushThenNotify(let p) = a {
+                assert(p.episode == remote, "flush 되는 건 보류 중이던 원격 종료")
+            } else {
+                assert(false, "다른 원인 재시작 ⇒ flushThenNotify (got \(a))")
+            }
+            assert(st.pending == nil && st.chainStartedAt == agent.startedAt, "새 세션은 에이전트 시작부터")
+        }
+        do {
+            // 안전 채널은 정착 창 없이 즉시, 길이 무관.
+            var st = ChatNotify.EndSettler()
+            let e = ep(t0, 5, cause: .agent, detail: "claude", reason: .batteryLow)
+            _ = st.noteStart(e, now: t0)
+            if case .sendNow(let em) = st.noteEnd(e, settings: cfg(), now: t0.addingTimeInterval(5)) {
+                assert(em.duration == 5, "안전 해제는 5초라도 즉시 전송")
+            } else {
+                assert(false, "안전 채널 ⇒ sendNow")
+            }
+            // 게이트 OFF ⇒ drop
+            var st2 = ChatNotify.EndSettler()
+            let long = ep(t0, 600)
+            _ = st2.noteStart(long, now: t0)
+            assert(st2.noteEnd(long, settings: cfg(end: false), now: t0.addingTimeInterval(600)) == .drop,
+                   "notifyAwakeEnd OFF ⇒ drop")
+            assert(ChatNotify.formatFlapBreakdown(["claude": 1, "pmset:NetworkClient": 12]) == "pmset:NetworkClient ×12, claude ×1",
+                   "요약 꼬리는 많은 것부터")
+        }
 
         print("── 설정 back-compat")
         let legacy = Data("""

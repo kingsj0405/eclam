@@ -64,8 +64,10 @@ enum TelegramSupportTestMain {
                "notifySafety OFF 여도 agentCeased 는 awakeEnd 채널로 전송")
         assert(!ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased, durationSeconds: 59),
                "agentCeased 59초 ⇒ 깜빡임 억제")
-        assert(ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased, durationSeconds: 60),
-               "agentCeased 60초 ⇒ 전송")
+        assert(!ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased, durationSeconds: 65),
+               "agentCeased 65초(원격 유예 60초짜리 깜빡임) ⇒ 억제 — 최소 길이는 유예보다 길다")
+        assert(ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .agentCeased, durationSeconds: 120),
+               "agentCeased 120초 ⇒ 전송")
         assert(!ChatNotify.shouldNotifyEnd(settings: cfg(end: false), reason: .agentCeased, durationSeconds: 3600),
                "notifyAwakeEnd OFF ⇒ agentCeased 미전송")
         assert(!ChatNotify.shouldNotifyEnd(settings: cfg(), reason: .manualOff, durationSeconds: 3600),

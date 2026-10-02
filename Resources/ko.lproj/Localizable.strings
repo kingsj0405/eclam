@@ -396,6 +396,8 @@
 "telegram.end.remoteEnded" = "⚪️ 원격 세션 종료 (%1$@) — %2$@ 동안 깨어있다 종료";
 "telegram.end.remoteLost" = "⚪️ 원격 세션 끊김 (네트워크 유실) — %@ 동안 깨어있다 종료";
 "telegram.end.generic" = "⚪️ 깨어있기 종료 — %@";
+"telegram.end.mergedSuffix" = " · 짧은 재시작 %d회 합침";
+"telegram.flapSummary" = "🔁 지난 %2$@ 동안 짧은 깨어있음 %1$d회 (%3$@)";
 
 /* ADR-0028 §7 — 주기 무음 다이제스트 */
 "telegram.evtDigest" = "작업 중 주기 상태 (무음), 간격";
@@ -479,4 +481,6 @@
 "slack.end.remoteEnded" = "⚪️ 원격 세션 종료 (%1$@) — %2$@ 동안 깨어있다 종료";
 "slack.end.remoteLost" = "⚪️ 원격 세션 끊김 (네트워크 유실) — %@ 동안 깨어있다 종료";
 "slack.end.generic" = "⚪️ 깨어있기 종료 — %@";
+"slack.end.mergedSuffix" = " · 짧은 재시작 %d회 합침";
+"slack.flapSummary" = "🔁 지난 %2$@ 동안 짧은 깨어있음 %1$d회 (%3$@)";
 "slack.vpn.dropped" = "🔌 VPN 끊김 (%@) — FortiClient 재인증 필요(SAML). 자동 재연결 없음.";

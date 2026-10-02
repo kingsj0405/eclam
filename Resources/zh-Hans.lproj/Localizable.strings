@@ -397,6 +397,8 @@
 "telegram.end.remoteEnded" = "⚪️ 远程会话结束 (%1$@) — 唤醒持续 %2$@ 后结束";
 "telegram.end.remoteLost" = "⚪️ 远程会话中断 (网络丢失) — 唤醒持续 %@ 后结束";
 "telegram.end.generic" = "⚪️ 唤醒结束 — %@";
+"telegram.end.mergedSuffix" = " · 已合并 %d 次短暂重启";
+"telegram.flapSummary" = "🔁 过去 %2$@ 内有 %1$d 次短暂唤醒 (%3$@)";
 
 /* ADR-0028 §7 — 定期静默摘要 */
 "telegram.evtDigest" = "工作期间定期状态 (静默),间隔";
@@ -480,4 +482,6 @@
 "slack.end.remoteEnded" = "⚪️ 远程会话结束 (%1$@) — 唤醒持续 %2$@ 后结束";
 "slack.end.remoteLost" = "⚪️ 远程会话中断 (网络丢失) — 唤醒持续 %@ 后结束";
 "slack.end.generic" = "⚪️ 唤醒结束 — %@";
+"slack.end.mergedSuffix" = " · 已合并 %d 次短暂重启";
+"slack.flapSummary" = "🔁 过去 %2$@ 内有 %1$d 次短暂唤醒 (%3$@)";
 "slack.vpn.dropped" = "🔌 VPN 已断开（%@）— FortiClient 需要重新认证（SAML）。不会自动重连。";

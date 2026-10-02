@@ -340,4 +340,18 @@ else
     echo "==> Skipping display topology tests (Tests/DisplayTopologyTests.swift absent)"
 fi
 
+# ── RemoteSignalParse 테스트 (2026-10-02 pmset 요약 행 오탐 회귀) ──────────
+# RemoteSignalParse.swift 는 Foundation-only 라 단독 컴파일 가능.
+if [ -f "$ROOT/Tests/RemoteSignalParseTests.swift" ]; then
+    echo "==> Compiling remote signal parse tests"
+    swiftc -target "$TARGET" -parse-as-library \
+        -o "$TMP/eclam_remotesignaltests" \
+        "$ROOT/Sources/ElectronicClamApp/RemoteSignalParse.swift" \
+        "$ROOT/Tests/RemoteSignalParseTests.swift"
+    echo "==> Running remote signal parse tests"
+    "$TMP/eclam_remotesignaltests"
+else
+    echo "==> Skipping remote signal parse tests (Tests/RemoteSignalParseTests.swift absent)"
+fi
+
 echo "==> All tests passed"

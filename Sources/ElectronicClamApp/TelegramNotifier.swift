@@ -35,6 +35,12 @@ final class TelegramNotifier {
     private var episodeStartedAt: Date?
     private var digestTimer: Timer?
 
+    /// 종료 정착 창·깜빡임 집계 (ChatNotify.SettleDriver, 2026-10-02). 메인 스레드 전용.
+    /// awakeEnd 채널 종료는 정착 창이 끝날 때까지 보류되고, 문안·전송만 여기로 돌아온다.
+    private lazy var settle = ChatNotify.SettleDriver(
+        emitEnd: { [weak self] in self?.emitEnd($0) },
+        emitFlapSummary: { [weak self] in self?.emitFlapSummary($0) })
+
     /// 마지막 전송 결과 — Settings 패널이 표시. nil ⇒ 이번 세션 전송 없음.
     /// 메인 스레드에서만 읽고 쓴다.
     private(set) var lastSendResult: String?
@@ -135,12 +141,16 @@ final class TelegramNotifier {
     // MARK: - Episode events (AwakeHistoryStore 탭, 메인 스레드)
 
     func episodeStarted(_ ep: AwakeEpisode) {
+        let proceed = settle.episodeStarted(ep)
         episodeOngoing = true
-        episodeStartedAt = ep.startedAt
+        // 다이제스트 기준 시각은 이어 본 세션의 첫 시작.
+        episodeStartedAt = settle.chainStartedAt ?? ep.startedAt
         reconfigureDigestTimer()
+        // 정착 창 안의 같은 원인 재시작 — 보류 종료와 이 시작을 모두 삼켰다.
+        guard proceed else { return }
         guard ChatNotify.shouldNotifyStart(settings: settings,
-                                                cause: ep.startCause,
-                                                lastStartAt: lastStartNotifiedAt) else { return }
+                                           cause: ep.startCause,
+                                           lastStartAt: lastStartNotifiedAt) else { return }
         lastStartNotifiedAt = Date()
         let head: String
         switch ep.startCause {
@@ -158,11 +168,21 @@ final class TelegramNotifier {
         episodeOngoing = false
         episodeStartedAt = nil
         reconfigureDigestTimer()
-        guard ChatNotify.shouldNotifyEnd(settings: settings,
-                                              reason: ep.endReason ?? .unknown,
-                                              durationSeconds: ep.duration) else { return }
-        let dur = ChatNotify.formatDuration(ep.duration)
-        let head: String
+        settle.episodeEnded(ep, settings: settings)
+    }
+
+    private func emitFlapSummary(_ summary: ChatNotify.EndSettler.FlapSummary) {
+        let head = NSLf("telegram.flapSummary", "🔁 %1$d short awake blips in the last %2$@ (%3$@)",
+                        summary.count, ChatNotify.formatDuration(ChatNotify.flapSummaryIntervalSeconds),
+                        ChatNotify.formatFlapBreakdown(summary.byDetail))
+        send(compose(head))
+    }
+
+    /// 종료 한 통 — 사유별 문안 + (있으면) 합친 재시작 수 꼬리.
+    private func emitEnd(_ emission: ChatNotify.EndSettler.Emission) {
+        let ep = emission.episode
+        let dur = ChatNotify.formatDuration(emission.duration)
+        var head: String
         switch ep.endReason ?? .unknown {
         case .agentCeased:
             head = NSLf("telegram.end.agentIdle", "⚪️ %1$@ went idle — awake ended after %2$@",
@@ -187,6 +207,9 @@ final class TelegramNotifier {
             // manualOff/forceSleep/appQuit 은 게이팅에서 .never 로 걸러졌고,
             // 여기 남는 건 unknown 뿐.
             head = NSLf("telegram.end.generic", "⚪️ Awake ended after %@", dur)
+        }
+        if emission.mergedCount > 0 {
+            head += NSLf("telegram.end.mergedSuffix", " · %d short restarts merged", emission.mergedCount)
         }
         send(compose(head))
     }

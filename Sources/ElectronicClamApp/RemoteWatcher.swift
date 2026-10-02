@@ -161,32 +161,9 @@ final class RemoteWatcher {
     private func pmsetAssertionChannels() -> Set<String> {
         guard let text = Subprocess.capture("/usr/bin/pmset", ["-g", "assertions"],
                                             timeoutSeconds: 4) else { return [] }
-        var found: Set<String> = []
-        for raw in text.split(separator: "\n") {
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            // Lines like:
-            //   pid 123(screensharingd): [...] NetworkClientActive named: "..."
-            //   pid 456(ARDAgent): [...] PreventSystemSleep named: "..."
-            //   pid 789(launchd): [...] PreventUserIdleSystemSleep named: "com.apple.NetworkSharing"
-            // We grep loosely — false positives here just mean "stay awake",
-            // which is the safe direction for a remote-session detector.
-            let lower = line.lowercased()
-            if lower.contains("networkclientactive") {
-                found.insert("pmset:NetworkClient")
-            }
-            if lower.contains("preventsystemsleep") || lower.contains("preventuseridlesystemsleep") {
-                if lower.contains("screensharing") {
-                    found.insert("pmset:ScreenSharing")
-                }
-                if lower.contains("apple remote desktop") || lower.contains("ardagent") {
-                    found.insert("pmset:ARD")
-                }
-                if lower.contains("networkclient") || lower.contains("com.apple.networksharing") {
-                    found.insert("pmset:NetworkClient")
-                }
-            }
-        }
-        return found
+        // 파싱은 순수 계층(RemoteSignalParse)으로 — 요약 표의 "NetworkClientActive 0"
+        // 을 양성으로 읽던 오탐을 거기서 막는다 (2026-10-02, 테스트 동반).
+        return RemoteSignalParse.pmsetChannels(from: text)
     }
 
     // MARK: - Signal 2 — who (SSH idle-aware, ADR-0016)

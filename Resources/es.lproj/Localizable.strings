@@ -397,6 +397,8 @@
 "telegram.end.remoteEnded" = "⚪️ Sesión remota terminada (%1$@) — despierto durante %2$@";
 "telegram.end.remoteLost" = "⚪️ Sesión remota perdida (sin red) — despierto durante %@";
 "telegram.end.generic" = "⚪️ Fin del periodo despierto — %@";
+"telegram.end.mergedSuffix" = " · %d reinicios breves fusionados";
+"telegram.flapSummary" = "🔁 %1$d despertares breves en los últimos %2$@ (%3$@)";
 
 /* ADR-0028 §7 — resumen periódico silencioso */
 "telegram.evtDigest" = "Estado periódico mientras trabaja (silencioso), cada";
@@ -480,4 +482,6 @@
 "slack.end.remoteEnded" = "⚪️ Sesión remota terminada (%1$@) — despierto durante %2$@";
 "slack.end.remoteLost" = "⚪️ Sesión remota perdida (sin red) — despierto durante %@";
 "slack.end.generic" = "⚪️ Fin del periodo despierto — %@";
+"slack.end.mergedSuffix" = " · %d reinicios breves fusionados";
+"slack.flapSummary" = "🔁 %1$d despertares breves en los últimos %2$@ (%3$@)";
 "slack.vpn.dropped" = "🔌 VPN desconectada (%@) — FortiClient necesita volver a autenticarse (SAML). Sin reconexión automática.";
